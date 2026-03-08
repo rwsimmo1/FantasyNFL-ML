@@ -1,0 +1,41 @@
+name: "Copilot Setup Steps"
+
+# This workflow file grants the GitHub Copilot coding agent the permissions
+# it needs to commit changes and open pull requests in this repository.
+#
+# The 'copilot-setup-steps' job name is a reserved name recognised by the
+# Copilot coding agent. Any steps defined here run inside the agent's
+# environment before it begins working on a task, making it the right place
+# to install dependencies or perform other one-time setup.
+#
+# The top-level 'permissions' block is the mechanism that grants write access:
+#   contents: write      – allows the agent to push commits
+#   pull-requests: write – allows the agent to open and update pull requests
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "copilot/**"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
