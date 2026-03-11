@@ -1,0 +1,15 @@
+- Scikit-learn: Supervised learning overview
+  https://scikit-learn.org/stable/supervised_learning.html
+
+- Cross-validation & model evaluation
+  https://scikit-learn.org/stable/modules/cross_validation.html
+
+- Ridge regression (L2 regularization)
+  https://scikit-learn.org/stable/modules/linear_model.html#ridge-regression
+
+- Feature preprocessing (scaling, missing values)
+  https://scikit-learn.org/stable/modules/preprocessing.html
+  https://scikit-learn.org/stable/modules/impute.html
+
+- Data leakage (why time splits matter)
+  https://scikit-learn.org/stable/common_pitfalls.html#data-leakage
