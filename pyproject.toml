@@ -14,7 +14,8 @@ dependencies = [
     "polars",
     "scikit-learn",
     "python-dotenv",
-    "pytest"
+    "pytest",
+    "nflreadpy"
 ]
 
 [project.optional-dependencies]

@@ -37,6 +37,10 @@ class FantasyScoring:
     def_fumble_recovery: float = DEFAULT_SCORING_RULES["def_fumble_recovery"]
     def_td: float = DEFAULT_SCORING_RULES["def_td"]
 
+     # Kicking (MVP)
+    xpm: float = 1.0
+    fgm: float = 3.0
+
 
 def scoring_from_mode(mode: str, provider: str = "ESPN") -> FantasyScoring:
     """Return ``FantasyScoring`` preset from scoring mode."""
