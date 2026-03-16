@@ -77,3 +77,31 @@ As we implement each stage, we’ll map it to a short learning checkpoint:
 - Every function should have an accompanying **unit test**.
 - Network calls (downloading nflverse data) should be wrapped so unit tests can **mock** them.
 - Time-based splits for training/validation/testing to avoid **data leakage**.
+
+## How to read MAE, RMSE, and R²
+
+When evaluating the Ridge regression model, these three metrics are the most
+important:
+
+- **MAE (Mean Absolute Error)**  
+  Average size of the prediction error.  
+  If MAE = `12`, predictions are off by about **12 points** on average.  
+  **Lower is better.**
+
+- **RMSE (Root Mean Squared Error)**  
+  Similar to MAE, but gives extra weight to large mistakes.  
+  If RMSE is much higher than MAE, the model makes some big misses.  
+  **Lower is better.**
+
+- **R² (R-squared)**  
+  Measures how much of the target variation the model explains.  
+  - `1.0` = perfect fit  
+  - `0.0` = no better than predicting the average  
+  - `< 0.0` = worse than predicting the average  
+  **Higher is better.**
+
+### Quick rule of thumb
+
+- Start by tracking **MAE** for “typical error size.”
+- Use **RMSE** to check whether big errors are a problem.
+- Use **R²** as an overall quality score for explained variance.
