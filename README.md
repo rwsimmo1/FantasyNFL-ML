@@ -102,6 +102,162 @@ important:
 
 ### Quick rule of thumb
 
-- Start by tracking **MAE** for “typical error size.”
+- Start by tracking **MAE** for "typical error size."
 - Use **RMSE** to check whether big errors are a problem.
 - Use **R²** as an overall quality score for explained variance.
+
+---
+
+## Install
+
+```powershell
+cd d:\development\FantasyNFL-ML
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e .
+python -m pip install pytest polars scikit-learn nflreadpy
+```
+
+## Run all tests
+
+```powershell
+pytest -q
+```
+
+## Run specific test files
+
+```powershell
+pytest tests\test_model_ridge.py tests\test_model_evaluation.py tests\test_features_season_features.py -v
+```
+
+## Run ridge training runner
+
+```powershell
+python -m fantasy_ml.runners.run_train_ridge
+```
+
+---
+
+## Understanding the evaluation pipeline
+
+Once the model is trained, we run several evaluation steps to understand
+**how well it works** and **where it adds value**. This section explains
+each step in plain language.
+
+---
+
+### Step 1 — Compare Ridge to a naive baseline
+
+**What it does**
+Runs the same time-aware split and compares two sets of predictions
+side by side:
+
+| Model | Prediction rule |
+|---|---|
+| Naive baseline | Next season = this season's points (no model needed) |
+| Ridge regression | Next season = weighted combination of feature columns |
+
+**Why it matters**
+This is one of the most important habits in ML. If a sophisticated model
+cannot beat a trivially simple rule, the model is not adding value. Always
+establish a baseline before claiming a model is useful.
+
+**What to look for**
+Ridge MAE should be lower than naive MAE. If it is not, the features or
+regularization strength may need adjustment.
+
+---
+
+### Step 2 — Train one Ridge model per position
+
+**What it does**
+Trains five separate Ridge models — one each for QB, RB, WR, TE, and K —
+then reports per-position metrics and combined overall metrics.
+
+**Why it matters**
+Players at different positions score fantasy points in completely different
+ways:
+- QBs score through passing touchdowns and yards
+- RBs score through rushing yards and receptions
+- Ks score through field goals and extra points
+
+A single model trained on all positions at once must compromise between all
+of these patterns. Per-position models can specialise on each position's
+unique scoring behaviour.
+
+**What to look for**
+Compare per-position MAE to the combined model MAE. Some positions
+(e.g. QB) tend to be more predictable than others (e.g. RB).
+
+---
+
+### Step 3 — Top-N slice metrics
+
+**What it does**
+Instead of measuring accuracy across all players (including bench-warmers
+and injured players who score near zero), slice metrics evaluate the model
+only on the players that matter most in fantasy:
+
+| Slice | Who is included |
+|---|---|
+| Top-24 per position | The 24 highest-scoring actual players at each position |
+| Top-100 overall | The 100 highest-scoring actual players across all positions |
+
+**Why it matters**
+A model that is accurate overall but terrible on elite players is not useful
+for fantasy drafts. Slice metrics reveal how well the model performs
+**where it actually matters**.
+
+**What to look for**
+Top-N MAE will usually be higher than overall MAE because elite players
+have more variance in their scores. The goal is to minimise it.
+
+---
+
+### Step 4 — Spearman rank correlation by position
+
+**What it does**
+Instead of comparing raw point totals, Spearman correlation ranks each
+player within their position (1st, 2nd, 3rd, etc.) by actual points and
+by predicted points, then measures how well those orderings agree.
+
+| Score | Meaning |
+|---|---|
+| 1.0 | Model ranks all players in perfect order |
+| 0.0 | Model rankings are random (no relationship to actual) |
+| -1.0 | Model ranks players in completely reversed order |
+
+**Why it matters**
+In fantasy football, **ranking players correctly is often more important
+than predicting exact point totals**. A model that says Player A will
+score 180 points and Player B will score 160 points is useful even if the
+real scores turn out to be 220 and 195 — as long as the ordering is right.
+Spearman correlation captures this ranking quality directly.
+
+**What to look for**
+A Spearman correlation above **0.5** within a position is a reasonable
+starting target. Above **0.7** is strong. Below **0.3** suggests the model
+is struggling to rank that position reliably.
+
+---
+
+### Learning references
+
+**Baseline models and why they matter**
+- [Scikit-learn dummy estimators](https://scikit-learn.org/stable/modules/model_evaluation.html#dummy-estimators)
+
+**Regression metrics (MAE, RMSE, R²)**
+- [Scikit-learn regression metrics guide](https://scikit-learn.org/stable/modules/model_evaluation.html#regression-metrics)
+- [StatQuest: R-squared explained (YouTube)](https://www.youtube.com/watch?v=2AQKmw14mHM)
+
+**Ridge regression and regularization**
+- [Scikit-learn Ridge regression user guide](https://scikit-learn.org/stable/modules/linear_model.html#ridge-regression)
+- [StatQuest: Regularization Part 2 - Ridge (YouTube)](https://www.youtube.com/watch?v=Q81RR3yKn30)
+
+**Spearman rank correlation**
+- [Wikipedia: Spearman's rank correlation](https://en.wikipedia.org/wiki/Spearman%27s_rank_correlation_coefficient)
+- [SciPy spearmanr documentation](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.spearmanr.html)
+
+**Slice-based evaluation**
+- [Google PAIR: What-If Tool (slice evaluation)](https://pair-code.github.io/what-if-tool/)

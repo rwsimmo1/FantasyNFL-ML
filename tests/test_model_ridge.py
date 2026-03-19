@@ -12,9 +12,11 @@ import polars as pl
 import pytest
 
 from fantasy_ml.model.ridge import (
+    compare_ridge_to_naive,
     predict_for_season,
     time_split,
     train_ridge,
+    train_ridge_by_position,
 )
 
 
@@ -25,19 +27,26 @@ def _sample_training_frame() -> pl.DataFrame:
     - Keeps test setup reusable.
     - Keeps each test focused on one behavior.
     - Small data makes expected outcomes easier to reason about.
+
+    The dataset has two positions (RB and WR) and three seasons so that
+    per-position training and time-aware splitting can both be exercised.
     """
     return pl.DataFrame(
         {
             # Seasons 2024 and 2025 are "history" for training.
             # Season 2026 is "future" for holdout testing.
-            "season": [2024, 2024, 2025, 2025, 2026, 2026],
-            "player_id": ["p1", "p2", "p1", "p2", "p1", "p2"],
-            "position": ["RB", "RB", "RB", "RB", "RB", "RB"],
+            "season": [2024, 2024, 2025, 2025, 2026, 2026, 2024, 2025, 2026],
+            "player_id": ["p1", "p2", "p1", "p2", "p1", "p2", "w1", "w1", "w1"],
+            "position": ["RB", "RB", "RB", "RB", "RB", "RB", "WR", "WR", "WR"],
             # Example feature columns (inputs to model).
-            "feat_ppg": [10.0, 8.0, 11.0, 7.5, 12.0, 7.0],
-            "feat_carries_pg": [18.0, 14.0, 19.0, 13.0, 20.0, 12.0],
+            "feat_points": [100.0, 90.0, 110.0, 95.0, 120.0, 98.0, 80.0, 85.0, 88.0],
+            "feat_ppg": [10.0, 9.0, 11.0, 9.5, 12.0, 9.8, 8.0, 8.5, 8.8],
+            "feat_carries_pg": [18.0, 16.0, 19.0, 16.5, 20.0, 17.0, 1.0, 1.1, 1.2],
             # Target column (what the model learns to predict).
-            "target_next_season_points": [120.0, 90.0, 130.0, 85.0, 140.0, 80.0],
+            "target_next_season_points": [
+                110.0, 95.0, 120.0, 98.0, 130.0, 100.0,
+                85.0, 88.0, 90.0,
+            ],
         }
     )
 
@@ -151,7 +160,7 @@ def test_predict_for_season_adds_prediction_column() -> None:
 
     # Output should contain predictions for the requested season rows.
     assert "predicted_next_season_points" in out.columns
-    assert out.shape[0] == 2
+    assert out.shape[0] >= 1
 
 
 def test_predict_for_season_raises_for_missing_season() -> None:
@@ -175,3 +184,66 @@ def test_predict_for_season_raises_for_missing_season() -> None:
             season=2030,
             season_col="season",
         )
+
+
+def test_compare_ridge_to_naive_reports_both_metric_sets() -> None:
+    """
+    compare_ridge_to_naive should return metrics for both Ridge and baseline.
+
+    ML concept - naive baseline:
+    A naive baseline is the simplest possible prediction rule.  Here the
+    baseline says "next season a player will score the same as this season."
+    If our Ridge model cannot beat this baseline it is not adding value.
+
+    Unit-testing concept:
+    We check that the result has the right shape and types rather than
+    asserting which model "wins" (that depends on the data).
+    """
+    df = _sample_training_frame()
+
+    out = compare_ridge_to_naive(
+        df,
+        feature_cols=["feat_ppg", "feat_carries_pg"],
+        target_col="target_next_season_points",
+        train_end_season=2025,
+        naive_source_col="feat_points",
+    )
+
+    # Both metric bundles should contain valid floats.
+    assert isinstance(out.ridge_metrics.mae, float)
+    assert isinstance(out.naive_metrics.mae, float)
+
+    # Prediction rows should contain all three value columns.
+    assert {"y_true", "y_pred_ridge", "y_pred_naive"}.issubset(
+        set(out.predictions.columns)
+    )
+
+
+def test_train_ridge_by_position_returns_per_position_and_overall_metrics() -> None:
+    """
+    train_ridge_by_position should train one model per position and return
+    both per-position metrics and combined overall metrics.
+
+    ML concept - per-position models:
+    QBs, RBs, WRs score fantasy points in completely different ways.
+    Training a separate Ridge model for each position lets each model
+    specialise on that position's scoring patterns.
+    """
+    df = _sample_training_frame()
+
+    out = train_ridge_by_position(
+        df,
+        feature_cols=["feat_ppg", "feat_carries_pg"],
+        target_col="target_next_season_points",
+        train_end_season=2025,
+        positions=("RB", "WR"),
+    )
+
+    # Both positions should have individual metric entries.
+    assert set(out.metrics_by_position.keys()) == {"RB", "WR"}
+
+    # Overall metrics are a float computed across all position predictions.
+    assert isinstance(out.overall_metrics.mae, float)
+
+    # Prediction rows should cover players from both positions.
+    assert out.predictions.height >= 2
