@@ -261,3 +261,15 @@ is struggling to rank that position reliably.
 
 **Slice-based evaluation**
 - [Google PAIR: What-If Tool (slice evaluation)](https://pair-code.github.io/what-if-tool/)
+
+## Feature notes
+
+### `feat_age`
+`feat_age` is the player's age (in years) for that season, derived from nflverse player metadata (`birth_date`).
+
+- **How it is computed:** age on **September 1** of the season year (used as a consistent season-start reference date).
+- **Why it exists:** player performance is age-dependent (development, peak years, and decline), so age helps the model separate players with similar recent stats but different career stages.
+- **How it is used in modeling:** `feat_age` is included as an input feature for Ridge regression.  
+  The pipeline also uses `feat_age_sq` (age squared) so the model can learn a non-linear aging curve.
+
+In the 2026 prediction output (`pred_2026_from_2025.csv`), `feat_age` is shown as a reference column so users can interpret predictions in age context.
